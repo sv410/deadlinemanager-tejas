@@ -72,8 +72,8 @@ export default function LandingPage() {
                 asChild
                 className="transition-all hover:scale-105 shadow-xl shadow-orange-500/30 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-black font-semibold rounded-full"
               >
-                <Link href="/api/auth/google">
-                  Get Started with Google
+                <Link href="/dashboard">
+                  Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -115,8 +115,8 @@ export default function LandingPage() {
                 asChild
                 className="text-base px-10 py-7 transition-all hover:scale-105 shadow-2xl shadow-orange-500/40 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-black font-semibold rounded-2xl"
               >
-                <Link href="/api/auth/google">
-                  Start Free Today with Google
+                <Link href="/dashboard">
+                  Start Managing Deadlines Now
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>

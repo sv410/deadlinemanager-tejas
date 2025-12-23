@@ -1,43 +1,362 @@
-import { createClient } from "@/lib/supabase/server"
-import { DashboardContent } from "@/components/dashboard/dashboard-content"
+'use client'
 
-export default async function DashboardPage() {
-  const hasSupabase = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const supabase = hasSupabase ? await createClient() : null
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Logo } from '@/components/logo'
+import Link from 'next/link'
+import { CursorGlow } from '@/components/cursor-glow'
+import {
+  Plus,
+  Clock,
+  Calendar,
+  Trash2,
+  CheckCircle2,
+  ArrowLeft,
+  Bell,
+  Settings,
+  Home,
+} from 'lucide-react'
 
-  let { data, error } = supabase ? await supabase.auth.getUser() : { data: null, error: null }
-  let user = supabase && !error && data?.user ? data.user : null
+interface Deadline {
+  id: string
+  title: string
+  dueDate: string
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  status: 'pending' | 'in_progress' | 'completed'
+  createdAt: string
+}
 
-  if (supabase && !user) {
-    const demoEmail = `demo_${Date.now()}@deadlinesync.demo`
-    const demoPassword = `demo${Math.random().toString(36).substring(7)}`
-    const { data: signUpData } = await supabase.auth.signUp({
-      email: demoEmail,
-      password: demoPassword,
-      options: {
-        data: {
-          full_name: "Guest",
-          is_demo: true,
-        },
-      },
-    })
-    if (signUpData?.user) {
-      await supabase.auth.signInWithPassword({ email: demoEmail, password: demoPassword })
-      const result = await supabase.auth.getUser()
-      user = result.data.user ?? null
+export default function DashboardPage() {
+  const [deadlines, setDeadlines] = useState<Deadline[]>([])
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newDeadline, setNewDeadline] = useState({
+    title: '',
+    dueDate: '',
+    priority: 'medium' as const,
+  })
+
+  // Load deadlines from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('deadlines')
+    if (saved) {
+      setDeadlines(JSON.parse(saved))
     }
+  }, [])
+
+  // Save deadlines to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('deadlines', JSON.stringify(deadlines))
+  }, [deadlines])
+
+  const priorityColors = {
+    low: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    high: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    critical: 'bg-red-500/20 text-red-400 border-red-500/30',
   }
 
-  const { data: profile } =
-    supabase && user ? await supabase.from("profiles").select("*").eq("id", user.id).single() : { data: null }
+  const statusColors = {
+    pending: 'bg-gray-500/20 text-gray-400',
+    in_progress: 'bg-blue-500/20 text-blue-400',
+    completed: 'bg-green-500/20 text-green-400',
+  }
 
-  const { data: deadlines } = supabase && user
-    ? await supabase
-        .from("deadlines")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("deadline_date", { ascending: true })
-    : { data: [] }
+  const handleAddDeadline = () => {
+    if (!newDeadline.title || !newDeadline.dueDate) return
 
-  return <DashboardContent user={user} profile={profile} initialDeadlines={deadlines || []} />
+    const deadline: Deadline = {
+      id: Date.now().toString(),
+      title: newDeadline.title,
+      dueDate: newDeadline.dueDate,
+      priority: newDeadline.priority,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    }
+
+    setDeadlines([...deadlines, deadline])
+    setNewDeadline({ title: '', dueDate: '', priority: 'medium' })
+    setShowAddForm(false)
+  }
+
+  const handleDeleteDeadline = (id: string) => {
+    setDeadlines(deadlines.filter((d) => d.id !== id))
+  }
+
+  const handleCompleteDeadline = (id: string) => {
+    setDeadlines(
+      deadlines.map((d) =>
+        d.id === id ? { ...d, status: 'completed' } : d
+      )
+    )
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  return (
+    <div className="min-h-screen bg-black">
+      <CursorGlow />
+
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-orange-500/20 bg-black/80 backdrop-blur-xl">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/">
+              <Logo />
+            </Link>
+            <nav className="hidden md:flex items-center gap-6">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 text-sm font-medium text-orange-500"
+              >
+                <Home className="h-4 w-4" />
+                Dashboard
+              </Link>
+              <button className="flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-orange-500 transition-colors">
+                <Bell className="h-4 w-4" />
+                Notifications
+              </button>
+              <button className="flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-orange-500 transition-colors">
+                <Settings className="h-4 w-4" />
+                Settings
+              </button>
+            </nav>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              asChild
+              className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-black font-semibold rounded-full"
+            >
+              <Link href="/">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Home
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-12">
+        <div className="max-w-6xl mx-auto">
+          {/* Header Section */}
+          <div className="mb-12">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              Your <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">Deadlines</span>
+            </h1>
+            <p className="text-lg text-gray-400 mb-8">
+              Manage all your deadlines, track time, and stay on top of everything.
+            </p>
+
+            {/* Add Deadline Button */}
+            <Button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-black font-semibold rounded-lg"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Add New Deadline
+            </Button>
+          </div>
+
+          {/* Add Deadline Form */}
+          {showAddForm && (
+            <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-8 mb-12 backdrop-blur-xl">
+              <h2 className="text-xl font-bold text-white mb-6">Create New Deadline</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Deadline Title
+                  </label>
+                  <input
+                    type="text"
+                    value={newDeadline.title}
+                    onChange={(e) =>
+                      setNewDeadline({ ...newDeadline, title: e.target.value })
+                    }
+                    placeholder="Enter deadline title..."
+                    className="w-full bg-zinc-800/50 border border-orange-500/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Due Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={newDeadline.dueDate}
+                      onChange={(e) =>
+                        setNewDeadline({ ...newDeadline, dueDate: e.target.value })
+                      }
+                      className="w-full bg-zinc-800/50 border border-orange-500/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Priority
+                    </label>
+                    <select
+                      value={newDeadline.priority}
+                      onChange={(e) =>
+                        setNewDeadline({
+                          ...newDeadline,
+                          priority: e.target.value as any,
+                        })
+                      }
+                      className="w-full bg-zinc-800/50 border border-orange-500/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                    >
+                      <option value="low">Low Priority</option>
+                      <option value="medium">Medium Priority</option>
+                      <option value="high">High Priority</option>
+                      <option value="critical">Critical Priority</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={handleAddDeadline}
+                    className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-black font-semibold rounded-lg"
+                  >
+                    Create Deadline
+                  </Button>
+                  <Button
+                    onClick={() => setShowAddForm(false)}
+                    variant="outline"
+                    className="border-orange-500/20 text-gray-400 hover:text-white"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Deadlines List */}
+          <div className="space-y-4">
+            {deadlines.length === 0 ? (
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-12 text-center backdrop-blur-xl">
+                <Calendar className="h-16 w-16 text-orange-500/40 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  No deadlines yet
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  Create your first deadline to get started!
+                </p>
+                <Button
+                  onClick={() => setShowAddForm(true)}
+                  className="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-black font-semibold rounded-lg"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Deadline
+                </Button>
+              </div>
+            ) : (
+              deadlines.map((deadline) => (
+                <div
+                  key={deadline.id}
+                  className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl hover:border-orange-500/40 transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <h3 className="text-xl font-bold text-white">
+                          {deadline.title}
+                        </h3>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                            priorityColors[deadline.priority]
+                          }`}
+                        >
+                          {deadline.priority.charAt(0).toUpperCase() +
+                            deadline.priority.slice(1)}{' '}
+                          Priority
+                        </span>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            statusColors[deadline.status]
+                          }`}
+                        >
+                          {deadline.status === 'in_progress'
+                            ? 'In Progress'
+                            : deadline.status.charAt(0).toUpperCase() +
+                              deadline.status.slice(1)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-6 text-sm text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-orange-500" />
+                          <span>{formatDate(deadline.dueDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-orange-500" />
+                          <span>Created: {formatDate(deadline.createdAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 ml-4">
+                      {deadline.status !== 'completed' && (
+                        <Button
+                          onClick={() => handleCompleteDeadline(deadline.id)}
+                          size="sm"
+                          className="bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Complete
+                        </Button>
+                      )}
+                      <Button
+                        onClick={() => handleDeleteDeadline(deadline.id)}
+                        size="sm"
+                        className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Stats */}
+          {deadlines.length > 0 && (
+            <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl">
+                <div className="text-sm text-gray-400 mb-2">Total Deadlines</div>
+                <div className="text-3xl font-bold text-orange-400">
+                  {deadlines.length}
+                </div>
+              </div>
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl">
+                <div className="text-sm text-gray-400 mb-2">In Progress</div>
+                <div className="text-3xl font-bold text-blue-400">
+                  {deadlines.filter((d) => d.status === 'in_progress').length}
+                </div>
+              </div>
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl">
+                <div className="text-sm text-gray-400 mb-2">Completed</div>
+                <div className="text-3xl font-bold text-green-400">
+                  {deadlines.filter((d) => d.status === 'completed').length}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  )
 }
