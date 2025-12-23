@@ -24,6 +24,8 @@ interface Deadline {
   priority: 'low' | 'medium' | 'high' | 'critical'
   status: 'pending' | 'in_progress' | 'completed'
   createdAt: string
+  // Indicates if a specific time was set by the user
+  hasTime?: boolean
 }
 
 export default function DashboardPage() {
@@ -31,7 +33,8 @@ export default function DashboardPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newDeadline, setNewDeadline] = useState({
     title: '',
-    dueDate: '',
+    dueDate: '', // yyyy-mm-dd
+    dueTime: '', // HH:MM (optional)
     priority: 'medium' as const,
   })
 
@@ -47,6 +50,23 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem('deadlines', JSON.stringify(deadlines))
   }, [deadlines])
+
+  // Analytics helpers
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+  const overdueCount = deadlines.filter((d) => d.status !== 'completed' && new Date(d.dueDate) < now).length
+  const dueTodayCount = deadlines.filter((d) => {
+    const dd = new Date(d.dueDate)
+    return dd >= startOfToday && dd <= endOfToday
+  }).length
+  const upcoming7Count = deadlines.filter((d) => {
+    const dd = new Date(d.dueDate)
+    return dd > now && dd <= in7Days && d.status !== 'completed'
+  }).length
+  const pastEventsCount = deadlines.filter((d) => new Date(d.dueDate) < now).length
 
   const priorityColors = {
     low: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -64,17 +84,24 @@ export default function DashboardPage() {
   const handleAddDeadline = () => {
     if (!newDeadline.title || !newDeadline.dueDate) return
 
+    // Compose ISO datetime using local timezone
+    const [year, month, day] = newDeadline.dueDate.split('-').map((v) => parseInt(v, 10))
+    const hasTime = !!newDeadline.dueTime
+    const [hours, minutes] = hasTime ? newDeadline.dueTime.split(':').map((v) => parseInt(v, 10)) : [0, 0]
+    const localDate = new Date(year, (month - 1), day, hours, minutes)
+
     const deadline: Deadline = {
       id: Date.now().toString(),
       title: newDeadline.title,
-      dueDate: newDeadline.dueDate,
+      dueDate: localDate.toISOString(),
       priority: newDeadline.priority,
       status: 'pending',
       createdAt: new Date().toISOString(),
+      hasTime,
     }
 
     setDeadlines([...deadlines, deadline])
-    setNewDeadline({ title: '', dueDate: '', priority: 'medium' })
+    setNewDeadline({ title: '', dueDate: '', dueTime: '', priority: 'medium' })
     setShowAddForm(false)
   }
 
@@ -90,15 +117,19 @@ export default function DashboardPage() {
     )
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+  const formatDateDMY = (dateString: string) => {
+    const d = new Date(dateString)
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}-${mm}-${yyyy}`
+  }
+
+  const formatTimeHM = (dateString: string) => {
+    const d = new Date(dateString)
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    return `${hh}:${mm}`
   }
 
   return (
@@ -187,17 +218,32 @@ export default function DashboardPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Due Date & Time
+                      Due Date
                     </label>
                     <input
-                      type="datetime-local"
+                      type="date"
                       value={newDeadline.dueDate}
                       onChange={(e) =>
                         setNewDeadline({ ...newDeadline, dueDate: e.target.value })
                       }
+                      className="w-full bg-zinc-800/50 border border-orange-500/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Time (optional)
+                    </label>
+                    <input
+                      type="time"
+                      value={newDeadline.dueTime}
+                      onChange={(e) =>
+                        setNewDeadline({ ...newDeadline, dueTime: e.target.value })
+                      }
+                      placeholder="--:--"
                       className="w-full bg-zinc-800/50 border border-orange-500/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
                     />
                   </div>
@@ -298,11 +344,17 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-6 text-sm text-gray-400">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-orange-500" />
-                          <span>{formatDate(deadline.dueDate)}</span>
+                          <span>{formatDateDMY(deadline.dueDate)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-orange-500" />
-                          <span>Created: {formatDate(deadline.createdAt)}</span>
+                          <span>
+                            {deadline.hasTime ? formatTimeHM(deadline.dueDate) : '--:--'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-orange-500" />
+                          <span>Created: {formatDateDMY(deadline.createdAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -352,6 +404,28 @@ export default function DashboardPage() {
                 <div className="text-3xl font-bold text-green-400">
                   {deadlines.filter((d) => d.status === 'completed').length}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Analytics */}
+          {deadlines.length > 0 && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl">
+                <div className="text-sm text-gray-400 mb-2">Due Today</div>
+                <div className="text-3xl font-bold text-amber-400">{dueTodayCount}</div>
+              </div>
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl">
+                <div className="text-sm text-gray-400 mb-2">Overdue</div>
+                <div className="text-3xl font-bold text-red-400">{overdueCount}</div>
+              </div>
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl">
+                <div className="text-sm text-gray-400 mb-2">Upcoming (7 days)</div>
+                <div className="text-3xl font-bold text-orange-300">{upcoming7Count}</div>
+              </div>
+              <div className="bg-zinc-900/80 border border-orange-500/20 rounded-2xl p-6 backdrop-blur-xl">
+                <div className="text-sm text-gray-400 mb-2">Past Events</div>
+                <div className="text-3xl font-bold text-gray-300">{pastEventsCount}</div>
               </div>
             </div>
           )}
