@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/logo'
 import Link from 'next/link'
 import { CursorGlow } from '@/components/cursor-glow'
+import { useDeadlines } from '@/hooks/useDeadlines'
+import { useAuth } from '@/hooks/useAuth'
+import { useRouter } from 'next/navigation'
 import {
   Plus,
   Clock,
@@ -15,23 +18,24 @@ import {
   Bell,
   Settings,
   Home,
+  LogOut,
+  Loader2,
+  User,
 } from 'lucide-react'
 
-interface Deadline {
-  id: string
-  title: string
-  dueDate: string
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'pending' | 'in_progress' | 'completed'
-  createdAt: string
-  // Indicates if a specific time was set by the user
-  hasTime?: boolean
-  // Track completion time for analysis
-  completedAt?: string
-}
-
 export default function DashboardPage() {
-  const [deadlines, setDeadlines] = useState<Deadline[]>([])
+  const router = useRouter()
+  const { user, isAuthenticated, logout } = useAuth()
+  const {
+    deadlines,
+    analytics,
+    isLoading,
+    error,
+    addDeadline,
+    completeDeadline,
+    removeDeadline,
+  } = useDeadlines()
+  
   const [showAddForm, setShowAddForm] = useState(false)
   const [newDeadline, setNewDeadline] = useState({
     title: '',
@@ -40,40 +44,33 @@ export default function DashboardPage() {
     priority: 'medium' as const,
   })
 
-  // Load deadlines from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('deadlines')
-    if (saved) {
-      setDeadlines(JSON.parse(saved))
-    }
-  }, [])
+  const handleLogout = () => {
+    logout()
+    router.push('/')
+  }
 
-  // Save deadlines to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('deadlines', JSON.stringify(deadlines))
-  }, [deadlines])
-
-  // Analytics helpers
+  // Analytics helpers (use backend analytics if available, otherwise calculate locally)
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
   const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-  const overdueCount = deadlines.filter((d) => d.status !== 'completed' && new Date(d.dueDate) < now).length
+  // Use backend analytics if available (authenticated mode)
+  const overdueCount = analytics?.overdue_count ?? deadlines.filter((d) => d.status !== 'completed' && new Date(d.deadline) < now).length
   const dueTodayCount = deadlines.filter((d) => {
-    const dd = new Date(d.dueDate)
+    const dd = new Date(d.deadline)
     return dd >= startOfToday && dd <= endOfToday
   }).length
-  const upcoming7Count = deadlines.filter((d) => {
-    const dd = new Date(d.dueDate)
+  const upcoming7Count = analytics?.upcoming_count ?? deadlines.filter((d) => {
+    const dd = new Date(d.deadline)
     return dd > now && dd <= in7Days && d.status !== 'completed'
   }).length
-  const pastEventsCount = deadlines.filter((d) => new Date(d.dueDate) < now).length
+  const pastEventsCount = deadlines.filter((d) => new Date(d.deadline) < now).length
 
   // Past deadline analysis
-  const pastDeadlines = deadlines.filter((d) => new Date(d.dueDate) < now)
-  const completedOnTime = pastDeadlines.filter((d) => d.status === 'completed' && new Date(d.completedAt || 0) <= new Date(d.dueDate)).length
-  const completedLate = pastDeadlines.filter((d) => d.status === 'completed' && new Date(d.completedAt || 0) > new Date(d.dueDate)).length
+  const pastDeadlines = deadlines.filter((d) => new Date(d.deadline) < now)
+  const completedOnTime = pastDeadlines.filter((d) => d.status === 'completed' && new Date(d.completed_at || 0) <= new Date(d.deadline)).length
+  const completedLate = pastDeadlines.filter((d) => d.status === 'completed' && new Date(d.completed_at || 0) > new Date(d.deadline)).length
   const failedCount = pastDeadlines.filter((d) => d.status !== 'completed').length
   const successRate = pastEventsCount > 0 ? Math.round((completedOnTime / pastEventsCount) * 100) : 0
 
@@ -90,7 +87,7 @@ export default function DashboardPage() {
     completed: 'bg-green-500/20 text-green-400',
   }
 
-  const handleAddDeadline = () => {
+  const handleAddDeadline = async () => {
     if (!newDeadline.title || !newDeadline.dueDate) return
 
     // Compose ISO datetime using local timezone
@@ -99,31 +96,38 @@ export default function DashboardPage() {
     const [hours, minutes] = hasTime ? newDeadline.dueTime.split(':').map((v) => parseInt(v, 10)) : [0, 0]
     const localDate = new Date(year, (month - 1), day, hours, minutes)
 
-    const deadline: Deadline = {
-      id: Date.now().toString(),
-      title: newDeadline.title,
-      dueDate: localDate.toISOString(),
-      priority: newDeadline.priority,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      hasTime,
+    try {
+      await addDeadline({
+        title: newDeadline.title,
+        dueDate: localDate.toISOString(),
+        priority: newDeadline.priority,
+        hasTime,
+      })
+      
+      setNewDeadline({ title: '', dueDate: '', dueTime: '', priority: 'medium' })
+      setShowAddForm(false)
+    } catch (err) {
+      console.error('Failed to add deadline:', err)
+      alert('Failed to add deadline. Please try again.')
     }
-
-    setDeadlines([...deadlines, deadline])
-    setNewDeadline({ title: '', dueDate: '', dueTime: '', priority: 'medium' })
-    setShowAddForm(false)
   }
 
-  const handleDeleteDeadline = (id: string) => {
-    setDeadlines(deadlines.filter((d) => d.id !== id))
+  const handleDeleteDeadline = async (id: number) => {
+    try {
+      await removeDeadline(id)
+    } catch (err) {
+      console.error('Failed to delete deadline:', err)
+      alert('Failed to delete deadline. Please try again.')
+    }
   }
 
-  const handleCompleteDeadline = (id: string) => {
-    setDeadlines(
-      deadlines.map((d) =>
-        d.id === id ? { ...d, status: 'completed', completedAt: new Date().toISOString() } : d
-      )
-    )
+  const handleCompleteDeadline = async (id: number) => {
+    try {
+      await completeDeadline(id)
+    } catch (err) {
+      console.error('Failed to complete deadline:', err)
+      alert('Failed to complete deadline. Please try again.')
+    }
   }
 
   const formatDateDMY = (dateString: string) => {
@@ -171,6 +175,33 @@ export default function DashboardPage() {
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            {isAuthenticated && user ? (
+              <>
+                <div className="hidden md:flex items-center gap-2 text-sm text-gray-400">
+                  <User className="h-4 w-4" />
+                  <span>{user.name}</span>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="border-orange-500/20 text-gray-400 hover:text-white"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                asChild
+                className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-semibold rounded-full"
+              >
+                <Link href="/auth/login">
+                  Sign In
+                </Link>
+              </Button>
+            )}
             <Button
               size="sm"
               asChild
@@ -195,6 +226,7 @@ export default function DashboardPage() {
             </h1>
             <p className="text-lg text-gray-400 mb-8">
               Manage all your deadlines, track time, and stay on top of everything.
+              {isAuthenticated ? ' (Synced with cloud)' : ' (Guest mode - stored locally)'}
             </p>
 
             {/* Add Deadline Button */}
@@ -206,6 +238,22 @@ export default function DashboardPage() {
               Add New Deadline
             </Button>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-red-400">
+              {error}
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+              <span className="ml-3 text-gray-400">Loading deadlines...</span>
+            </div>
+          ) : (
+            <>
 
           {/* Add Deadline Form */}
           {showAddForm && (
@@ -353,12 +401,12 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-6 text-sm text-gray-400">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-orange-500" />
-                          <span>{formatDateDMY(deadline.dueDate)}</span>
+                          <span>{formatDateDMY(deadline.deadline)}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-orange-500" />
+                          <Clock className="h-4 w-4 text-orange-400" />
                           <span>
-                            {deadline.hasTime ? formatTimeHM(deadline.dueDate) : '--:--'}
+                            {deadline.hasTime ? formatTimeHM(deadline.deadline) : '--:--'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -473,10 +521,10 @@ export default function DashboardPage() {
                   {pastDeadlines.length === 0 ? (
                     <p className="text-gray-400 text-sm">No past deadlines</p>
                   ) : (
-                    pastDeadlines.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()).map((deadline) => {
-                      const isDueDate = new Date(deadline.dueDate)
+                    pastDeadlines.sort((a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime()).map((deadline) => {
+                      const isDueDate = new Date(deadline.deadline)
                       const isCompleted = deadline.status === 'completed'
-                      const isOnTime = isCompleted && new Date(deadline.completedAt || 0) <= isDueDate
+                      const isOnTime = isCompleted && new Date(deadline.completed_at || 0) <= isDueDate
                       const isLate = isCompleted && new Date(deadline.completedAt || 0) > isDueDate
                       const isFailed = !isCompleted
 
@@ -502,7 +550,7 @@ export default function DashboardPage() {
                         <div key={deadline.id} className={`border rounded-lg p-4 flex justify-between items-center ${statusBg}`}>
                           <div>
                             <p className="text-white font-medium">{deadline.title}</p>
-                            <p className="text-gray-400 text-sm">Due: {formatDateDMY(deadline.dueDate)} at {deadline.hasTime ? formatTimeHM(deadline.dueDate) : '--:--'}</p>
+                            <p className="text-gray-400 text-sm">Due: {formatDateDMY(deadline.deadline)} at {deadline.hasTime ? formatTimeHM(deadline.deadline) : '--:--'}</p>
                           </div>
                           <div className="text-right">
                             <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold text-white bg-black/30">
@@ -516,6 +564,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+          )}
           )}
         </div>
       </main>
