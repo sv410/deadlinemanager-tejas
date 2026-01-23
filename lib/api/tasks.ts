@@ -5,7 +5,8 @@
 
 import { getAccessToken, getRefreshToken, refreshToken, storeTokens } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use relative paths for API calls (proxied through Next.js to backend)
+const API_URL = '/api';
 
 export interface Task {
   id: number;
