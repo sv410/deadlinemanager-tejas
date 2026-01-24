@@ -491,6 +491,7 @@ export default function DashboardPage() {
           {pastEventsCount > 0 && (
             <div className="mt-8">
               <h2 className="text-2xl font-bold text-white mb-6">Past Deadline Analysis</h2>
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-zinc-900/80 border border-green-500/20 rounded-2xl p-6 backdrop-blur-xl">
                   <div className="text-sm text-gray-400 mb-2">On-Time Completion</div>
@@ -521,51 +522,62 @@ export default function DashboardPage() {
                   {pastDeadlines.length === 0 ? (
                     <p className="text-gray-400 text-sm">No past deadlines</p>
                   ) : (
-                    pastDeadlines.sort((a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime()).map((deadline) => {
-                      const isDueDate = new Date(deadline.deadline)
-                      const isCompleted = deadline.status === 'completed'
-                      const isOnTime = isCompleted && new Date(deadline.completed_at || 0) <= isDueDate
-                      const isLate = isCompleted && new Date(deadline.completedAt || 0) > isDueDate
-                      const isFailed = !isCompleted
+                    pastDeadlines
+                      .sort((a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime())
+                      .map((deadline) => {
+                        const isDueDate = new Date(deadline.deadline)
+                        const isCompleted = deadline.status === 'completed'
+                        const isOnTime = isCompleted && new Date(deadline.completed_at || 0) <= isDueDate
+                        const isLate = isCompleted && new Date(deadline.completedAt || 0) > isDueDate
+                        const isFailed = !isCompleted
 
-                      let statusBg = ''
-                      let statusIcon = ''
-                      let statusText = ''
+                        let statusBg = ''
+                        let statusIcon = ''
+                        let statusText = ''
 
-                      if (isOnTime) {
-                        statusBg = 'bg-green-500/20 border-green-500/30'
-                        statusIcon = '✓'
-                        statusText = 'On Time'
-                      } else if (isLate) {
-                        statusBg = 'bg-orange-500/20 border-orange-500/30'
-                        statusIcon = '⚠'
-                        statusText = 'Late'
-                      } else if (isFailed) {
-                        statusBg = 'bg-red-500/20 border-red-500/30'
-                        statusIcon = '✕'
-                        statusText = 'Failed'
-                      }
+                        if (isOnTime) {
+                          statusBg = 'bg-green-500/20 border-green-500/30'
+                          statusIcon = '✓'
+                          statusText = 'On Time'
+                        } else if (isLate) {
+                          statusBg = 'bg-orange-500/20 border-orange-500/30'
+                          statusIcon = '⚠'
+                          statusText = 'Late'
+                        } else if (isFailed) {
+                          statusBg = 'bg-red-500/20 border-red-500/30'
+                          statusIcon = '✕'
+                          statusText = 'Failed'
+                        }
 
-                      return (
-                        <div key={deadline.id} className={`border rounded-lg p-4 flex justify-between items-center ${statusBg}`}>
-                          <div>
-                            <p className="text-white font-medium">{deadline.title}</p>
-                            <p className="text-gray-400 text-sm">Due: {formatDateDMY(deadline.deadline)} at {deadline.hasTime ? formatTimeHM(deadline.deadline) : '--:--'}</p>
+                        return (
+                          <div
+                            key={deadline.id}
+                            className={`border rounded-lg p-4 flex justify-between items-center ${statusBg}`}
+                          >
+                            <div>
+                              <p className="text-white font-medium">{deadline.title}</p>
+                              <p className="text-gray-400 text-sm">
+                                Due: {formatDateDMY(deadline.deadline)} at{' '}
+                                {deadline.hasTime ? formatTimeHM(deadline.deadline) : '--:--'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold text-white bg-black/30">
+                                {statusIcon} {statusText}
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold text-white bg-black/30">
-                              {statusIcon} {statusText}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })
+                        )
+                      })
                   )}
                 </div>
               </div>
             </div>
           )}
-          )}
+
+          </>
+        )}
+
         </div>
       </main>
     </div>

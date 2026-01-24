@@ -28,8 +28,8 @@ class TeamsService {
       }[message.priority];
 
       const payload = {
-        @type: 'MessageCard',
-        @context: 'https://schema.org/extensions',
+        '@type': 'MessageCard',
+        '@context': 'https://schema.org/extensions',
         summary: message.title,
         themeColor: themeColor,
         sections: [
@@ -49,7 +49,7 @@ class TeamsService {
         ],
         potentialAction: [
           {
-            @type: 'OpenUri',
+            '@type': 'OpenUri',
             name: 'View in DeadlineSync',
             targets: [
               {

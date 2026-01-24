@@ -50,6 +50,7 @@ class Task(Base):
     deadline = Column(DateTime, nullable=False, index=True)
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False, index=True)
     priority = Column(Enum(TaskPriority), default=TaskPriority.MEDIUM, nullable=False, index=True)
+    calendar_event_id = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime, nullable=True)
@@ -82,3 +83,45 @@ class Task(Base):
             return time_left.total_seconds() / 3600
         else:
             return -1  # Overdue
+
+
+class GoogleToken(Base):
+    __tablename__ = "google_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    scope = Column(Text, nullable=True)
+    token_type = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User")
+
+
+class NotificationChannel(str, enum.Enum):
+    EMAIL = "email"
+    CALENDAR = "calendar"
+
+
+class NotificationStatus(str, enum.Enum):
+    SENT = "sent"
+    FAILED = "failed"
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False, index=True)
+    channel = Column(Enum(NotificationChannel), nullable=False)
+    status = Column(Enum(NotificationStatus), nullable=False, default=NotificationStatus.SENT)
+    sent_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User")
+    task = relationship("Task")

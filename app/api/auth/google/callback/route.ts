@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Failed to create user" }, { status: 400 })
       }
 
-      user = { data: newUser }
+      user = { data: newUser, error: null, count: null, status: 200, statusText: 'OK' }
     }
 
     // Store Google tokens in database

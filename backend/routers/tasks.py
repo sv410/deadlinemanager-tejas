@@ -3,13 +3,23 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from models import User, Task, TaskStatus, TaskPriority
+from models import (
+    User,
+    Task,
+    TaskStatus,
+    TaskPriority,
+    GoogleToken,
+    Notification,
+    NotificationChannel,
+    NotificationStatus,
+)
 from schemas import (
     TaskCreate, TaskUpdate, TaskResponse, TaskDetailedResponse,
-    TaskAnalytics, PrioritizedTasksResponse
+    TaskAnalytics, PrioritizedTasksResponse, GoogleTokenUpsert, NotificationResponse,
 )
 from database import get_db
 from auth import get_current_user
+from services.google_integration import send_gmail_deadline, upsert_calendar_event
 
 router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
 
@@ -80,6 +90,7 @@ def task_to_detailed_response(task: Task) -> TaskDetailedResponse:
         deadline=task.deadline,
         status=task.status,
         priority=task.priority,
+        calendar_event_id=task.calendar_event_id,
         created_at=task.created_at,
         updated_at=task.updated_at,
         completed_at=task.completed_at,
@@ -116,6 +127,41 @@ async def create_task(
     db.refresh(new_task)
     
     return task_to_detailed_response(new_task)
+
+
+@router.get("/upcoming", response_model=List[TaskDetailedResponse])
+async def get_upcoming_tasks(
+    days: int = Query(30, ge=1, le=365, description="Days ahead to include"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(days=days)
+    tasks = (
+        db.query(Task)
+        .filter(Task.user_id == current_user.id)
+        .filter(Task.deadline >= now)
+        .filter(Task.deadline <= cutoff)
+        .order_by(Task.deadline.asc())
+        .all()
+    )
+    return [task_to_detailed_response(t) for t in tasks]
+
+
+@router.get("/past", response_model=List[TaskDetailedResponse])
+async def get_past_tasks(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    now = datetime.now(timezone.utc)
+    tasks = (
+        db.query(Task)
+        .filter(Task.user_id == current_user.id)
+        .filter(Task.deadline < now)
+        .order_by(Task.deadline.desc())
+        .all()
+    )
+    return [task_to_detailed_response(t) for t in tasks]
 
 
 @router.get("/", response_model=List[TaskDetailedResponse])
@@ -229,6 +275,93 @@ async def delete_task(
     db.delete(task)
     db.commit()
     return None
+
+
+# --- Google Integrations ---
+
+
+@router.post("/google/tokens", response_model=GoogleTokenUpsert)
+async def upsert_google_tokens(
+    payload: GoogleTokenUpsert,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    token = db.query(GoogleToken).filter(GoogleToken.user_id == current_user.id).first()
+    if token:
+        token.access_token = payload.access_token
+        token.refresh_token = payload.refresh_token
+        token.expires_at = payload.expires_at
+        token.scope = payload.scope
+        token.token_type = payload.token_type
+    else:
+        token = GoogleToken(
+            user_id=current_user.id,
+            access_token=payload.access_token,
+            refresh_token=payload.refresh_token,
+            expires_at=payload.expires_at,
+            scope=payload.scope,
+            token_type=payload.token_type,
+        )
+        db.add(token)
+    db.commit()
+    return payload
+
+
+def _get_task_for_user(task_id: int, user: User, db: Session) -> Task:
+    task = db.query(Task).filter(and_(Task.id == task_id, Task.user_id == user.id)).first()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    return task
+
+
+def _get_google_token(user: User, db: Session) -> GoogleToken:
+    token = db.query(GoogleToken).filter(GoogleToken.user_id == user.id).first()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google token not found for user")
+    return token
+
+
+@router.post("/{task_id}/notify/email", response_model=NotificationResponse)
+async def notify_via_email(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    task = _get_task_for_user(task_id, current_user, db)
+    token = _get_google_token(current_user, db)
+    message_id = send_gmail_deadline(current_user, task, token)
+    notification = Notification(
+        user_id=current_user.id,
+        task_id=task.id,
+        channel=NotificationChannel.EMAIL,
+        status=NotificationStatus.SENT,
+        error_message=None,
+    )
+    db.add(notification)
+    db.commit()
+    return NotificationResponse(channel="email", status="sent", message_id=message_id)
+
+
+@router.post("/{task_id}/calendar", response_model=NotificationResponse)
+async def upsert_task_calendar(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    task = _get_task_for_user(task_id, current_user, db)
+    token = _get_google_token(current_user, db)
+    event_id = upsert_calendar_event(current_user, task, token, task.calendar_event_id)
+    task.calendar_event_id = event_id
+    notification = Notification(
+        user_id=current_user.id,
+        task_id=task.id,
+        channel=NotificationChannel.CALENDAR,
+        status=NotificationStatus.SENT,
+        error_message=None,
+    )
+    db.add(notification)
+    db.commit()
+    return NotificationResponse(channel="calendar", status="sent", calendar_event_id=event_id)
 
 
 @router.get("/analytics/dashboard", response_model=TaskAnalytics)

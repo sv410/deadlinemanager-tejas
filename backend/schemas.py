@@ -86,6 +86,7 @@ class TaskResponse(BaseModel):
     deadline: datetime
     status: TaskStatus
     priority: TaskPriority
+    calendar_event_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime]
@@ -101,6 +102,22 @@ class TaskDetailedResponse(TaskResponse):
     """Extended task response with analysis"""
     priority_score: float = Field(description="Calculated priority score (0-100)")
     urgency_level: str = Field(description="CRITICAL, HIGH, MEDIUM, LOW")
+
+
+class GoogleTokenUpsert(BaseModel):
+    access_token: str
+    refresh_token: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    scope: Optional[str] = None
+    token_type: Optional[str] = None
+
+
+class NotificationResponse(BaseModel):
+    channel: str
+    status: str
+    message_id: Optional[str] = None
+    calendar_event_id: Optional[str] = None
+
 
 
 # Authentication Schemas
