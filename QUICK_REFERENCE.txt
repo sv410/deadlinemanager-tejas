@@ -1,0 +1,86 @@
+# 🎯 DEPLOYMENT REFERENCE CARD
+
+## ⚡ FASTEST PATH (5 minutes)
+
+### Backend
+```
+URL: https://railway.app/dashboard
+Action: New Project → Deploy from GitHub → sv410/deadlinemanager-tejas
+Wait: 2-3 minutes
+Get: Your Railway URL
+```
+
+### Frontend
+```
+URL: https://vercel.com/dashboard
+Action: Add New → Import Repository → sv410/deadlinemanager-tejas
+Env: NEXT_PUBLIC_BACKEND_URL = [Your Railway URL]
+Wait: 2-3 minutes
+```
+
+### Verify
+```bash
+curl https://your-railway-url/health
+# Returns: {"status": "ok"}
+```
+
+---
+
+## 📍 Key URLs
+
+| Service | URL |
+|---------|-----|
+| Railway Dashboard | https://railway.app/dashboard |
+| Vercel Dashboard | https://vercel.com/dashboard |
+| Your Repository | https://github.com/sv410/deadlinemanager-tejas |
+
+---
+
+## 🔐 Environment Variables
+
+**Set in Vercel:**
+```
+NEXT_PUBLIC_BACKEND_URL = https://deadlinemanager-tejas.up.railway.app
+NEXT_PUBLIC_APP_URL = https://deadline-manager.vercel.app
+```
+
+---
+
+## 🛠️ If Something Fails
+
+| Error | Fix |
+|-------|-----|
+| Build error | `rm -rf .next && pnpm build` |
+| Backend 502 | Check Railway logs |
+| CORS error | Update Railway CORS settings |
+| API 404 | Check backend URL env var |
+
+---
+
+## 📚 Documentation Files
+
+| Need | File |
+|------|------|
+| Start here | [START_HERE.md](./START_HERE.md) |
+| Quick guide | [QUICK_DEPLOY.md](./QUICK_DEPLOY.md) |
+| Commands | [EXACT_DEPLOYMENT_STEPS.md](./EXACT_DEPLOYMENT_STEPS.md) |
+| Reference | [DEPLOYMENT_COMMANDS.md](./DEPLOYMENT_COMMANDS.md) |
+| Help | [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md) |
+
+---
+
+## ✅ Checklist
+
+- [ ] Backend deployed
+- [ ] Frontend deployed
+- [ ] Env vars configured
+- [ ] Health check passes
+- [ ] Frontend loads
+- [ ] API working
+
+---
+
+## 🚀 Deploy Now!
+
+**Open:** [START_HERE.md](./START_HERE.md)
+

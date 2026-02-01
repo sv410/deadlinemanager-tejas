@@ -1,68 +1,71 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 export async function signUpAction(formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
   const fullName = formData.get("fullName") as string
 
-  const supabase = await createServerClient()
-
-  // Create user with auto-confirmation
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-      },
-    },
-  })
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  // If user was created, sign them in immediately
-  if (data.user) {
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+  try {
+    // Register user via backend API
+    const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        name: fullName,
+      }),
     })
 
-    if (signInError) {
+    if (!response.ok) {
+      const error = await response.json()
+      return { error: error.detail || 'Registration failed' }
+    }
+
+    // Login after successful registration
+    const loginResponse = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (!loginResponse.ok) {
       return { error: "Account created but could not sign in. Please try logging in manually." }
     }
 
     redirect("/dashboard")
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Registration failed' }
   }
-
-  return { success: true }
 }
 
 export async function loginAction(formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
 
-  const supabase = await createServerClient()
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+    if (!response.ok) {
+      const error = await response.json()
+      return { error: error.detail || 'Login failed' }
+    }
 
-  if (error) {
-    return { error: error.message }
+    redirect("/dashboard")
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Login failed' }
   }
-
-  redirect("/dashboard")
 }
 
 export async function logoutAction() {
-  const supabase = await createServerClient()
-  await supabase.auth.signOut()
   redirect("/")
 }
 
@@ -71,32 +74,37 @@ export async function quickStartDemo() {
   const demoEmail = `demo_${Date.now()}@deadlinesync.demo`
   const demoPassword = `demo${Math.random().toString(36).substring(7)}`
 
-  const supabase = await createServerClient()
-
-  // Create demo account
-  const { data, error } = await supabase.auth.signUp({
-    email: demoEmail,
-    password: demoPassword,
-    options: {
-      data: {
-        full_name: "Demo User",
-        is_demo: true,
-      },
-    },
-  })
-
-  if (error) {
-    return { error: "Could not create demo account" }
-  }
-
-  // Auto sign in
-  if (data.user) {
-    await supabase.auth.signInWithPassword({
-      email: demoEmail,
-      password: demoPassword,
+  try {
+    // Create demo account via backend API
+    const registerResponse = await fetch(`${BACKEND_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: demoEmail,
+        password: demoPassword,
+        name: "Demo User",
+      }),
     })
 
-    redirect("/dashboard?demo=true")
+    if (!registerResponse.ok) {
+      return { error: "Could not create demo account" }
+    }
+
+    // Auto-login to demo account
+    const loginResponse = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: demoEmail,
+        password: demoPassword,
+      }),
+    })
+
+    if (loginResponse.ok) {
+      redirect("/dashboard?demo=true")
+    }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Demo mode failed' }
   }
 
   return { success: true }

@@ -1,8 +1,9 @@
-import { updateSession } from "@/lib/supabase/proxy"
-import type { NextRequest } from "next/server"
+import type { NextRequest, NextResponse } from "next/server"
 
-export async function proxy(request: NextRequest) {
-  return await updateSession(request)
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // Simplified proxy - no session handling needed for backend-only setup
+  const { NextResponse } = await import("next/server")
+  return NextResponse.next()
 }
 
 export const config = {
