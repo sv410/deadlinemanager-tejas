@@ -70,6 +70,26 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## 🚀 Deployment to Production
+
+Ready to deploy? We've made it simple!
+
+### Quick Deployment (Under 30 Minutes)
+
+**👉 See [DEPLOYMENT_QUICKSTART.md](DEPLOYMENT_QUICKSTART.md) for the complete step-by-step process.**
+
+This guide covers:
+- Setting up Supabase (Database & Auth)
+- Configuring Google OAuth
+- Deploying to Vercel (Free!)
+- All at $0/month cost
+
+### Alternative Deployment Options
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Detailed deployment options (Vercel, Railway, Render)
+- **[DEPLOY_NOW.md](DEPLOY_NOW.md)** - Quick reference for experienced developers
+- **[GOING_LIVE_CHECKLIST.md](GOING_LIVE_CHECKLIST.md)** - Comprehensive launch checklist
+
 ## 📁 Project Structure
 
 ```
