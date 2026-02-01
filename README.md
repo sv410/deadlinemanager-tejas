@@ -74,15 +74,24 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 Ready to deploy? We've made it simple!
 
-### Quick Deployment (Under 30 Minutes)
+### Complete Setup with Environment Variables
 
-**👉 See [DEPLOYMENT_QUICKSTART.md](DEPLOYMENT_QUICKSTART.md) for the complete step-by-step process.**
+**👉 See [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) for the complete deployment guide with all environment variables and Supabase connections.**
 
-This guide covers:
-- Setting up Supabase (Database & Auth)
-- Configuring Google OAuth
+This comprehensive guide covers:
+- Setting up Supabase (Database & Auth) with all SQL scripts
+- Configuring Google OAuth credentials
+- Complete environment variables setup
 - Deploying to Vercel (Free!)
+- Vercel-specific configuration
 - All at $0/month cost
+
+### Quick Reference Guides
+
+- **[VERCEL_SETUP.md](VERCEL_SETUP.md)** - Vercel environment variables quick reference
+- **[DEPLOYMENT_QUICKSTART.md](DEPLOYMENT_QUICKSTART.md)** - 30-minute quick deployment
+- **[ENV_VARIABLES_GUIDE.md](ENV_VARIABLES_GUIDE.md)** - Environment variables documentation
+- **[scripts/README.md](scripts/README.md)** - Database migration scripts guide
 
 ### Alternative Deployment Options
 
