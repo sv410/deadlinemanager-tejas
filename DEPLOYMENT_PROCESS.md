@@ -98,7 +98,9 @@ The **deployment process** for DeadlineSync involves 3 main steps:
 **A:** Yes! See `DEPLOYMENT.md` for Railway and Render options.
 
 ### Q: What about the backend?
-**A:** This is a Next.js app with API routes. Everything deploys together on Vercel. The "backend" folder is a separate Python service (optional for extended features).
+**A:** This application has two backend options:
+1. **Primary (Recommended):** Next.js API routes + Supabase - Deploys automatically with Vercel
+2. **Alternative:** Python FastAPI backend in `backend/` folder - Optional, for extended features. See `DEPLOYMENT.md` for Railway deployment instructions if needed.
 
 ---
 
